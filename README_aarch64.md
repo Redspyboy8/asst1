@@ -1,6 +1,6 @@
 # Assignment 1: Performance Analysis on a Quad-Core CPU #
 
-**Due Fri Oct 3, 11:59pm**
+**This assignment was done as extra practice**
 
 **100 points total + 6 points extra credit**
 
