@@ -30,32 +30,25 @@ extern void mandelbrotSerial(
 //
 // Thread entrypoint.
 void workerThreadStart(WorkerArgs * const args) {
-
+    // double starTime = CycleTimer::currentSeconds();
     int numRows = args->height / args->numThreads;
-    int startRow = numRows * args->threadId;
     
-    //If we have an uneven division, the remainder goes to the last thread
-    //TODO: evenly distribute remainder as much as possible
 
-    int remainder = args->height % args->numThreads;
-    if (args->threadId == args->numThreads - 1 && remainder) {
-        numRows += remainder;
+    for (int i = 0; i < numRows; ++i) {
+        int computedRow = args->threadId + (i * args->numThreads);
+        mandelbrotSerial(
+            args->x0,
+            args->y0,
+            args->x1,
+            args->y1,
+            args->width,
+            args->height,
+            computedRow,
+            1,
+            args->maxIterations,
+            args->output
+        );
     }
-
-    mandelbrotSerial(
-        args->x0,
-        args->y0,
-        args->x1,
-        args->y1,
-        args->width,
-        args->height,
-        startRow,
-        numRows,
-        args->maxIterations,
-        args->output
-    );
-
-    
 }
 
 //
