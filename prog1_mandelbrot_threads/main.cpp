@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <algorithm>
 #include <getopt.h>
+#include <cstring>
+
 
 #include "CycleTimer.h"
 

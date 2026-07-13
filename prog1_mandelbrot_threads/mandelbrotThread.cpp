@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <thread>
+#include <cstdlib>
+
 
 #include "CycleTimer.h"
 
@@ -29,13 +31,31 @@ extern void mandelbrotSerial(
 // Thread entrypoint.
 void workerThreadStart(WorkerArgs * const args) {
 
-    // TODO FOR CS149 STUDENTS: Implement the body of the worker
-    // thread here. Each thread should make a call to mandelbrotSerial()
-    // to compute a part of the output image.  For example, in a
-    // program that uses two threads, thread 0 could compute the top
-    // half of the image and thread 1 could compute the bottom half.
+    int numRows = args->height / args->numThreads;
+    int startRow = numRows * args->threadId;
+    
+    //If we have an uneven division, the remainder goes to the last thread
+    //TODO: evenly distribute remainder as much as possible
 
-    printf("Hello world from thread %d\n", args->threadId);
+    int remainder = args->height % args->numThreads;
+    if (args->threadId == args->numThreads - 1 && remainder) {
+        numRows += remainder;
+    }
+
+    mandelbrotSerial(
+        args->x0,
+        args->y0,
+        args->x1,
+        args->y1,
+        args->width,
+        args->height,
+        startRow,
+        numRows,
+        args->maxIterations,
+        args->output
+    );
+
+    
 }
 
 //
