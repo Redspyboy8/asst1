@@ -250,6 +250,67 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
   
+  __cs149_mask ones_mask = _cs149_init_ones();
+  __cs149_vec_int zeros_int_vec = _cs149_vset_int(0);
+  __cs149_vec_int ones_int_vec = _cs149_vset_int(1);
+  __cs149_vec_float nine_float_vec = _cs149_vset_float(9.999999f);
+  
+  
+  int remainder = N % VECTOR_WIDTH;
+  
+  //Calculate evenly divided sections via intrinsics 
+  for (int i = 0; i < N; i+= VECTOR_WIDTH) {
+    auto value_index = values + i;
+    auto exponents_index = exponents + i;
+    auto output_index = output + i;
+
+    
+    __cs149_mask compute_next_mask = _cs149_init_ones();
+    __cs149_mask clamped_mask = {};
+    __cs149_mask load_mask = _cs149_init_ones();
+    
+    __cs149_vec_float values_vec = {};
+    __cs149_vec_int exponents_vec = {};
+    __cs149_vec_float output_vec = _cs149_vset_float(1);
+
+    //This Ensures we do not operate on oob values when remainder is present
+    if (remainder && i + VECTOR_WIDTH >= N) {
+      load_mask = _cs149_mask_not(load_mask);
+      int loadMaskArr[VECTOR_WIDTH] = {};
+      for (int i = 0; i < remainder; i++) {
+        load_mask.value[i] = true;
+      }
+
+      compute_next_mask = _cs149_mask_and(compute_next_mask, load_mask);
+    }
+    
+    _cs149_vload_float(values_vec, value_index, load_mask);
+    _cs149_vload_int(exponents_vec, exponents_index, load_mask);
+
+    while(_cs149_cntbits(compute_next_mask) > 0) {
+
+
+      //CN Mask: 1 if exp > 0
+      _cs149_vgt_int(compute_next_mask, exponents_vec, zeros_int_vec, compute_next_mask);
+      
+      //Multiply Operation
+      _cs149_vmult_float(output_vec, output_vec, values_vec, compute_next_mask);
+
+      //Clamped Mask: 1 if output > 9.999f
+      _cs149_vgt_float(clamped_mask, output_vec, nine_float_vec, compute_next_mask);   
+      _cs149_vset_float(output_vec, 9.999999f, clamped_mask);
+
+      //update CN with and: 1 if not (clamped or zero)
+      auto not_clamped_mask = _cs149_mask_not(clamped_mask);
+      compute_next_mask = _cs149_mask_and(compute_next_mask, not_clamped_mask);
+
+      //decrement exponents vec
+      _cs149_vsub_int(exponents_vec, exponents_vec, ones_int_vec, compute_next_mask);
+   }
+
+   _cs149_vstore_float(output_index, output_vec, load_mask);
+  }
+  
 }
 
 // returns the sum of all elements in values
