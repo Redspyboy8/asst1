@@ -274,6 +274,9 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
     __cs149_vec_float output_vec = _cs149_vset_float(1);
 
     //This Ensures we do not operate on oob values when remainder is present
+
+    //TODO: we shouldn't really be accessing struct internals here. 
+    //entirely viable to just an int vec and some boolean logic to do the same thing
     if (remainder && i + VECTOR_WIDTH >= N) {
       load_mask = _cs149_mask_not(load_mask);
       int loadMaskArr[VECTOR_WIDTH] = {};
@@ -327,15 +330,70 @@ float arraySumSerial(float* values, int N) {
 // You can assume N is a multiple of VECTOR_WIDTH
 // You can assume VECTOR_WIDTH is a power of 2
 float arraySumVector(float* values, int N) {
-  
-  //
-  // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
-  //
-  
-  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+  //shouldn't ever actually happen
+  if (N == 0) return 0.0;
 
+/*
+  This implementation uses hadd, interleave and an exlcusion mask to continuously cut the problem space in half
+  The exclusion mask is so that we can set 'discarded' values to 0, allowing us to take full advantage of
+  hadd and interleave with no issue. 
+*/
+  
+  //TODO (opt): Edge Case #1: N is NOT a multiple of VECTOR_WIDTH
+  //TODO (opt): Edge Case #2: VECTOR_WIDTH is NOT a power of 2
+
+  float resultBuffer[VECTOR_WIDTH] = {};
+  float result = 0.f;
+  __cs149_mask load_mask = _cs149_init_ones();
+  __cs149_vec_int zeroes_int_vec = _cs149_vset_int(0);
+  __cs149_vec_float zeroes_float_vec = _cs149_vset_float(0.f);
+
+
+  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+    float* values_index = values + i;
+
+
+    __cs149_mask exclusion_mask = _cs149_init_ones();
+
+    //Needed for logic regarding updating included_mask wo directly accessing struct internals
+    __cs149_vec_int exclusion_mask_vec = _cs149_vset_int(1);
+    int excludedMaskArr[VECTOR_WIDTH] = {};
+    _cs149_vstore_int(excludedMaskArr, exclusion_mask_vec, load_mask);
+
+    int exclusionIndex = 0;
+    int nextExclusionIndex = 0;
+
+    //Create and load array_sum_vec
+    __cs149_vec_float array_sum_vec = {};
+    _cs149_vload_float(array_sum_vec, values_index, load_mask);
+
+    while(_cs149_cntbits(exclusion_mask) > 1) {
+      //Update exclude vector
+      nextExclusionIndex = (exclusionIndex + ((VECTOR_WIDTH - exclusionIndex) / 2));
+      for (int i = exclusionIndex; i < nextExclusionIndex; i++) {
+        excludedMaskArr[i] = 0;
+      }
+      exclusionIndex = nextExclusionIndex;
+      _cs149_vload_int(exclusion_mask_vec, excludedMaskArr, load_mask);
+      
+      //Convert exclude vector to exclude mask
+      _cs149_vgt_int(exclusion_mask, exclusion_mask_vec, zeroes_int_vec, load_mask);
+
+      //Pairwise Add
+      _cs149_hadd_float(array_sum_vec, array_sum_vec);
+
+      //Interleave
+      _cs149_interleave_float(array_sum_vec, array_sum_vec); 
+
+      //0 out excluded values
+      _cs149_vmove_float(array_sum_vec, zeroes_float_vec, exclusion_mask);
+    }
+    //Store and add the result
+    _cs149_vstore_float(resultBuffer, array_sum_vec, load_mask);
+    result += resultBuffer[0];
+    resultBuffer[0] = 0;
   }
 
-  return 0.0;
+  return result;
 }
 
